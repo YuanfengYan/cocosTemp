@@ -35,7 +35,58 @@
          this.$store.scene = data;
          cc.director.loadScene(sceneName, onLaunched);
      },
- 
+
+     /** 加载界面预制体 */
+     _load_view_prefab(prefab,viewName){
+        return new Promise((resolve, reject)=>{
+            function callback(err,data){
+               if(err){
+                   reject(err)
+               }else{
+                   resolve(data)
+               }
+            }
+           ViewLoader.getViewNode(prefab, viewName, callback);
+        })
+    },
+    /** 初始化一个界面控制器 */
+    _init_view_ctrl(node ,show, parentNode,data,viewName) {
+        return new Promise((resolve, reject)=>{
+            const viewNode = node
+            const viewCtrl = new ViewCtrl();
+            const nodeCtrl = viewNode.getComponent(ViewComponent);
+            if (!nodeCtrl) {
+                cc.error('nodeCtrl:', nodeCtrl);
+                cc.error('viewNode:', viewNode);
+                cc.error('ViewComponent:', ViewComponent);
+            }
+            viewNode.active = show;
+            nodeCtrl.$data = data;
+            viewNode.name  = viewName;
+            viewCtrl.name = viewName;
+            viewCtrl.node = viewNode;
+            viewCtrl.ctrl = nodeCtrl;
+            viewNode._$data = data;
+            viewCtrl.zIndex = this.viewStack.length + 1;
+
+            /** 执行加载动画和过场动画 */
+            this.viewStack.push(viewCtrl);
+            viewCtrl.pushNode(parentNode);
+            // viewCtrl.autoExecOpenAction(function () {
+            //     return next(null)
+            // });
+
+            /** 万事具备 告诉系统界面打开了 */
+            if (show) {this.updateViews();}
+            viewCtrl.onViewOpen();
+
+            if (typeof cb === "function") {
+                return cb(null, viewCtrl);
+            }
+            resolve()
+        })
+    },
+
      /**
       * @title 显示一个view界面
       * @param {cc.Prefab|string} prefab
@@ -59,70 +110,14 @@
          }
          viewName = viewName || `view_${this.viewStack.length + 1}`;
          viewNode = viewNode || this.viewNode || cc.Canvas.instance.node;
-         cc.aha.Utils.debugLog('显示界面：', viewName, data);
          /** 构建打开页面的函数任务（这里用到了js的async函数库，目的是代码清晰） */
-         
-         const that = this;
-         const tasks = {
-             /** 加载界面预制体 */
-             load_view_prefab: function (_, next) {
-                 ViewLoader.getViewNode(prefab, viewName, next);
-             },
- 
-             /** 初始化一个界面控制器 */
-             init_view_ctrl: function (results, next) {
-                 const viewNode = results['load_view_prefab'];
-                 const viewCtrl = new ViewCtrl();
-                 const nodeCtrl = viewNode.getComponent(ViewComponent);
-                 if (!nodeCtrl) {
-                     cc.error('nodeCtrl:', nodeCtrl);
-                     cc.error('viewNode:', viewNode);
-                     cc.error('ViewComponent:', ViewComponent);
-                 }
-                 viewNode.active = show;
-                 nodeCtrl.$data = data;
-                 viewNode.name  = viewName;
-                 viewCtrl.name = viewName;
-                 viewCtrl.node = viewNode;
-                 viewCtrl.ctrl = nodeCtrl;
-                 viewNode._$data = data;
-                 viewCtrl.zIndex = that.viewStack.length + 1;
-                 return next(null, viewCtrl);
-             },
- 
-             /** 执行加载动画和过场动画 */
-             view_open_action: function (results, next) {
-                 const viewCtrl = results['init_view_ctrl'];
-                 that.viewStack.push(viewCtrl);
-                 viewCtrl.pushNode(viewNode);
-                 viewCtrl.autoExecOpenAction(function () {
-                     return next(null)
-                 });
-             },
- 
-             /** 万事具备 告诉系统界面打开了 */
-             open_view: function (results, next) {
-                 const viewCtrl = results['init_view_ctrl'];
-                 if (show) {that.updateViews();}
-                 viewCtrl.onViewOpen();
-                 return next(null);
-             }
-         };
-         /** 执行上述任务（同步运行） */
-         cc.aha.Utils.syncTasks(tasks, function (error, results) {
-             if (typeof cb === "function") {
-                 if (error) {
-                     return cb(error, null);
-                 } else {
-                     const viewCtrl = results['init_view_ctrl'];
-                     return cb(null, viewCtrl);
-                 }
-             } else {
-                 if (error) {
-                     return cc.error('view manager show view error:', error);
-                 }
-             }
-         });
+        Promise.resolve().then(()=>{
+            return this._load_view_prefab(prefab,viewName)//加载界面预制体
+        }).then((node)=> {
+            return this._init_view_ctrl(node,show,viewNode,data,viewName)//初始化一个界面控制器
+        }).catch((err)=>{
+            console.log('err', err)
+        })
      },
  
      /**
@@ -137,7 +132,7 @@
              viewName = args[0];
              cb = args[1];
          }
-         cc.aha.Utils.debugLog('退出界面：', viewName);
+         cc.core.Utils.debugLog('退出界面：', viewName);
          if (viewName) {
              if (viewName instanceof cc.Node) {
                  for (let index = this.viewStack.length - 1; index >= 0; index--) {
@@ -185,7 +180,7 @@
       * @title 像对应的view发送事件 在对应的view里面使用 this.node.on('event_name', ()=>{}) 监听
       */
      emitView (viewName, eventName, params) {
-         cc.aha.Utils.debugLog('界面通知事件：', viewName, eventName, params);
+         cc.core.Utils.debugLog('界面通知事件：', viewName, eventName, params);
          if (typeof viewName === "string" && typeof eventName === "string") {
              for (let index = this.viewStack.length - 1; index >= 0; index--) {
                  if (this.viewStack[index] && this.viewStack[index].name === viewName) {

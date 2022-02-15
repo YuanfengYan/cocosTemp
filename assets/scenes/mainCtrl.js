@@ -3,11 +3,11 @@
  */
 
 
-cc.macro.ALLOW_IMAGE_BITMAP = false;
-cc.macro.CLEANUP_IMAGE_CACHE = true;
-cc.macro.ENABLE_TRANSPARENT_CANVAS = true;
-cc.macro.ENABLE_WEBGL_ANTIALIAS = true;
-cc.macro.ENABLE_MULTI_TOUCH = false;
+// cc.macro.ALLOW_IMAGE_BITMAP = false;
+// cc.macro.CLEANUP_IMAGE_CACHE = true;
+// cc.macro.ENABLE_TRANSPARENT_CANVAS = true;
+// cc.macro.ENABLE_WEBGL_ANTIALIAS = true;
+// cc.macro.ENABLE_MULTI_TOUCH = false;
 
 cc.Class({
     extends: cc.Component,
@@ -18,22 +18,36 @@ cc.Class({
             default: null,
             displayName: '界面节点'
         },
+        DemoView :{
+            type: cc.Prefab,
+            default: null,
+            displayName: 'Demo'
+        }
     },
-    onLoad () {},
+    onLoad () {
+        this.initGame()
+    },
 
     start () {
 
     },
     initGame () {
-        this.load_core_bundle()
+        console.log(window.Global)
+        Promise.all([this.load_core_bundle()]).then(()=>{
+            cc.core.ViewManager.showView(this.DemoView,'DemoView')
+        })
     },
+    
     /**
      * 加载 Bundle
      */
     load_core_bundle () {
-        cc.assetManager.loadBundle('core',()=>{
-            console.log('加载完成core')
-        });
+        return new Promise((resolve, reject)=>{
+            cc.assetManager.loadBundle('core',()=>{
+                console.log('加载完成core')
+                resolve()
+            });
+        })
     },
     
 
